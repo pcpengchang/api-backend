@@ -5,9 +5,9 @@ import com.google.common.collect.Lists;
 import com.pc.apiclientsdk.utils.SignUtils;
 import com.pc.apicommon.model.entity.InterfaceInfo;
 import com.pc.apicommon.model.entity.User;
-import com.pc.apicommon.service.InnerInterfaceInfoService;
-import com.pc.apicommon.service.InnerUserInterfaceInfoService;
-import com.pc.apicommon.service.InnerUserService;
+import com.pc.apicommon.service.IInterfaceInfoService;
+import com.pc.apicommon.service.IUserInterfaceInfoService;
+import com.pc.apicommon.service.IUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboReference;
@@ -45,13 +45,13 @@ import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.O
 public class CustomGlobalFilter implements GlobalFilter, Ordered {
 
     @DubboReference
-    private InnerUserService innerUserService;
+    private IUserService innerUserService;
 
     @DubboReference
-    private InnerInterfaceInfoService innerInterfaceInfoService;
+    private IInterfaceInfoService innerInterfaceInfoService;
 
     @DubboReference
-    private InnerUserInterfaceInfoService innerUserInterfaceInfoService;
+    private IUserInterfaceInfoService innerUserInterfaceInfoService;
 
     private static final List<String> IP_WHITE_LIST = Collections.singletonList("127.0.0.1");
 
