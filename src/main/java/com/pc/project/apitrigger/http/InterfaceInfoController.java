@@ -7,22 +7,23 @@ import com.google.common.collect.Lists;
 import com.google.common.collect.Maps;
 import com.pc.apicommon.model.entity.InterfaceInfo;
 import com.pc.apicommon.model.entity.User;
-import com.pc.project.apistarter.annotation.AuthCheck;
-import com.pc.project.apicommon.response.BaseResponse;
 import com.pc.project.apicommon.request.DeleteRequest;
-import com.pc.project.apicommon.response.ErrorCode;
 import com.pc.project.apicommon.request.IdRequest;
+import com.pc.project.apicommon.response.BaseResponse;
+import com.pc.project.apicommon.response.ErrorCode;
+import com.pc.project.apicommon.service.InterfaceInfoService;
+import com.pc.project.apicommon.service.UserService;
+import com.pc.project.apistarter.annotation.AuthCheck;
 import com.pc.project.apistarter.constant.CommonConstant;
+import com.pc.project.apistarter.enums.InterfaceInfoStatusEnum;
 import com.pc.project.apistarter.exception.BusinessException;
-import com.pc.project.apistarter.service.RedisLimiterService;
-import com.pc.project.apidomain.interfaceinfo.dto.InterfaceInfoDTO;
+import com.pc.project.apistarter.handler.InterfaceInfoStateMachine;
+import com.pc.project.apistarter.model.dto.InterfaceInfoDTO;
 import com.pc.project.apistarter.model.request.interinfoinfo.InterfaceInfoAddRequest;
 import com.pc.project.apistarter.model.request.interinfoinfo.InterfaceInfoInvokeRequest;
 import com.pc.project.apistarter.model.request.interinfoinfo.InterfaceInfoQueryRequest;
 import com.pc.project.apistarter.model.request.interinfoinfo.InterfaceInfoUpdateRequest;
-import com.pc.project.apistarter.enums.InterfaceInfoStatusEnum;
-import com.pc.project.apicommon.service.InterfaceInfoService;
-import com.pc.project.apicommon.service.UserService;
+import com.pc.project.apistarter.service.rule.factory.DefaultLogicFactory;
 import com.pc.project.apistarter.utils.ResultUtils;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
@@ -62,7 +63,9 @@ public class InterfaceInfoController {
     private UserService userService;
 
     @Resource
-    private RedisLimiterService redisLimiterManager;
+    private DefaultLogicFactory logicFactory;
+
+    private final boolean isAsync = false;
 
     // IO 型线程池
     private final ExecutorService ioExecutorService = new ThreadPoolExecutor(4, 20, 10, TimeUnit.MINUTES,
@@ -156,7 +159,11 @@ public class InterfaceInfoController {
         boolean result = interfaceInfoService.updateById(interfaceInfo);
 
         //异步写
-        ioExecutorService.submit((() -> updateBaseInfo(id, interfaceInfo)));
+        if (isAsync) {
+            ioExecutorService.submit((() -> updateBaseInfo(id, interfaceInfo)));
+        } else {
+            updateBaseInfo(id, interfaceInfo);
+        }
         return ResultUtils.success(result);
     }
 
@@ -241,12 +248,14 @@ public class InterfaceInfoController {
         AtomicInteger cnt = new AtomicInteger(0);
 
         BASE_INFO_CACHE.forEach((k, v) -> {
+                    InterfaceInfo info = getInterfaceInfoCacheById(k);
+                    // if (info.getStatus() == InterfaceInfoStatusEnum.ONLINE.getValue()) {
                     cnt.getAndIncrement();
                     if (current == 1 && cnt.get() <= size) {
-                        interfaceInfoList.add(getInterfaceInfoCacheById(k));
+                        interfaceInfoList.add(info);
                     } else {
                         if (((current - 1) * size) + 1 <= cnt.get() && cnt.get() <= current * size) {
-                            interfaceInfoList.add(getInterfaceInfoCacheById(k));
+                            interfaceInfoList.add(info);
                         }
                     }
                 }
@@ -274,11 +283,20 @@ public class InterfaceInfoController {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
         long id = idRequest.getId();
-        // 判断是否存在
+
         InterfaceInfo oldInterfaceInfo = interfaceInfoService.getById(id);
+        // 判断是否存在
         if (oldInterfaceInfo == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
+
+        // 状态机判断是否允许做状态流转
+        InterfaceInfoStatusEnum toStatus = InterfaceInfoStatusEnum.ONLINE;
+        InterfaceInfoStatusEnum fromStatus = InterfaceInfoStatusEnum.findByCode(oldInterfaceInfo.getStatus());
+        if (!InterfaceInfoStateMachine.isValid(fromStatus, toStatus)) {
+            throw new BusinessException(ErrorCode.STATUS_UPDATE_ERROR);
+        }
+
         // TODO 判断该接口是否可以调用
 //        com.pc.apiclientsdk.model.User user = new com.pc.apiclientsdk.model.User();
 //        user.setUsername("test");
@@ -290,12 +308,16 @@ public class InterfaceInfoController {
         // 仅本人或管理员可修改
         InterfaceInfo interfaceInfo = new InterfaceInfo();
         interfaceInfo.setId(id);
-        interfaceInfo.setStatus(InterfaceInfoStatusEnum.ONLINE.getValue());
+        interfaceInfo.setStatus(toStatus.getValue());
         boolean result = interfaceInfoService.updateById(interfaceInfo);
 
-        //异步写
-        oldInterfaceInfo.setStatus(InterfaceInfoStatusEnum.ONLINE.getValue());
-        ioExecutorService.submit((() -> updateBaseInfo(id, oldInterfaceInfo)));
+        // 异步写
+        oldInterfaceInfo.setStatus(toStatus.getValue());
+        if (isAsync) {
+            ioExecutorService.submit((() -> updateBaseInfo(id, oldInterfaceInfo)));
+        } else {
+            updateBaseInfo(id, oldInterfaceInfo);
+        }
         return ResultUtils.success(result);
     }
 
@@ -319,27 +341,32 @@ public class InterfaceInfoController {
         if (oldInterfaceInfo == null) {
             throw new BusinessException(ErrorCode.NOT_FOUND_ERROR);
         }
+        // 状态机判断是否允许做状态流转
+        InterfaceInfoStatusEnum toStatus = InterfaceInfoStatusEnum.OFFLINE;
+        InterfaceInfoStatusEnum fromStatus = InterfaceInfoStatusEnum.findByCode(oldInterfaceInfo.getStatus());
+        if (!InterfaceInfoStateMachine.isValid(fromStatus, toStatus)) {
+            throw new BusinessException(ErrorCode.STATUS_UPDATE_ERROR);
+        }
+
         // 仅本人或管理员可修改
         InterfaceInfo interfaceInfo = new InterfaceInfo();
         interfaceInfo.setId(id);
-        interfaceInfo.setStatus(InterfaceInfoStatusEnum.OFFLINE.getValue());
+        interfaceInfo.setStatus(toStatus.getValue());
 
         boolean result = interfaceInfoService.updateById(interfaceInfo);
 
         //异步写
-        oldInterfaceInfo.setStatus(InterfaceInfoStatusEnum.OFFLINE.getValue());
-        ioExecutorService.submit((() -> updateBaseInfo(id, oldInterfaceInfo)));
+        oldInterfaceInfo.setStatus(toStatus.getValue());
+        if (isAsync) {
+            ioExecutorService.submit((() -> updateBaseInfo(id, oldInterfaceInfo)));
+        } else {
+            updateBaseInfo(id, oldInterfaceInfo);
+        }
         return ResultUtils.success(result);
     }
 
-    @GetMapping("/invoke")
-    public BaseResponse<Object> invokeInterfaceInfo(HttpServletRequest request) {
-        log.info("request ===> {}", request);
-        return ResultUtils.success(0);
-    }
-
     /**
-     * 测试调用（核心）
+     * 调用（核心）
      *
      * @param interfaceInfoInvokeRequest
      * @param request
@@ -349,9 +376,10 @@ public class InterfaceInfoController {
     public BaseResponse<Object> invokeInterfaceInfo(@RequestBody InterfaceInfoInvokeRequest
                                                             interfaceInfoInvokeRequest,
                                                     HttpServletRequest request) {
-        // 限流判断，每个用户一个限流器
+        // 前置规则过滤
         User loginUser = userService.getLoginUser(request);
-        redisLimiterManager.doRateLimit("invoke_" + loginUser.getId());
+        // redisLimiterManager.doRateLimit("invoke_" + loginUser.getId());
+        logicFactory.doCheck(loginUser);
 
         if (interfaceInfoInvokeRequest == null || interfaceInfoInvokeRequest.getId() <= 0) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);

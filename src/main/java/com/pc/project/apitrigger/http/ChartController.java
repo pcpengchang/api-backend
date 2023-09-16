@@ -6,10 +6,10 @@ import com.pc.apicommon.model.entity.User;
 import com.pc.project.apicommon.response.BaseResponse;
 import com.pc.project.apicommon.response.ErrorCode;
 import com.pc.project.apicommon.service.UserService;
-import com.pc.project.apistarter.model.request.bi.GenChartByAiRequest;
 import com.pc.project.apistarter.constant.CommonConstant;
 import com.pc.project.apistarter.exception.BusinessException;
-import com.pc.project.apistarter.service.RedisLimiterService;
+import com.pc.project.apistarter.model.request.bi.GenChartByAiRequest;
+import com.pc.project.apistarter.service.rule.factory.DefaultLogicFactory;
 import com.pc.project.apistarter.utils.ExcelUtils;
 import com.pc.project.apistarter.utils.ResultUtils;
 import com.pc.project.apistarter.utils.ThrowUtils;
@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 @Slf4j
 public class ChartController {
     @Resource
-    private RedisLimiterService redisLimiterManager;
+    private DefaultLogicFactory logicFactory;
 
     @Resource
     private UserService userService;
@@ -74,9 +74,9 @@ public class ChartController {
         final List<String> validFileSuffixList = Arrays.asList("xlsx");
         ThrowUtils.throwIf(!validFileSuffixList.contains(suffix), ErrorCode.PARAMS_ERROR, "文件后缀非法");
 
-        // 限流判断，每个用户一个限流器
+        // 前置规则过滤
         User loginUser = userService.getLoginUser(request);
-        redisLimiterManager.doRateLimit("invoke_" + loginUser.getId());
+        logicFactory.doCheck(loginUser);
 
         // 无需写 prompt，直接调用现有模型，https://www.yucongming.com，公众号搜【鱼聪明AI】
 //        final String prompt = "你是一个数据分析师和前端开发专家，接下来我会按照以下固定格式给你提供内容：\n" +
