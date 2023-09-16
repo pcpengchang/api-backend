@@ -4,9 +4,9 @@ import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import com.pc.apicommon.model.entity.InterfaceInfo;
 import com.pc.apicommon.service.IInterfaceInfoService;
 import com.pc.project.apicommon.response.ErrorCode;
-import com.pc.project.apistarter.exception.BusinessException;
-import com.pc.project.apiinfrastructure.mapper.InterfaceInfoMapper;
 import com.pc.project.apicommon.service.UserInterfaceInfoService;
+import com.pc.project.apiinfrastructure.mapper.InterfaceInfoMapper;
+import com.pc.project.apistarter.exception.BusinessException;
 import org.apache.commons.lang3.StringUtils;
 import org.apache.dubbo.config.annotation.DubboService;
 import org.springframework.util.CollectionUtils;
@@ -33,8 +33,10 @@ public class IInterfaceInfoServiceImpl implements IInterfaceInfoService {
         if (StringUtils.isBlank(path)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);
         }
+        // 走 idx_url_isDelete 联合索引
         QueryWrapper<InterfaceInfo> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("url", path);
+        queryWrapper.eq("isDelete", 0);
         List<InterfaceInfo> interfaceInfos = interfaceInfoMapper.selectList(queryWrapper);
         if (CollectionUtils.isEmpty(interfaceInfos)) {
             throw new BusinessException(ErrorCode.PARAMS_ERROR);

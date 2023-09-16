@@ -2,6 +2,7 @@ package com.pc.project.apistarter.enums;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -21,6 +22,11 @@ public enum InterfaceInfoStatusEnum {
     InterfaceInfoStatusEnum(String text, int value) {
         this.text = text;
         this.value = value;
+    }
+
+    public static InterfaceInfoStatusEnum findByCode(Integer value) {
+        return Arrays.stream(InterfaceInfoStatusEnum.values()).filter(typeEnum -> Objects.equals(typeEnum.getValue(), value))
+                .findFirst().orElse(null);
     }
 
     /**

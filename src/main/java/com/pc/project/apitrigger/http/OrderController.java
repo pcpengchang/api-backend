@@ -12,6 +12,7 @@ import com.alipay.api.response.AlipayTradePagePayResponse;
 import com.pc.project.apicommon.response.ErrorCode;
 import com.pc.project.apistarter.exception.BusinessException;
 import com.pc.project.apistarter.enums.PayChannelEnum;
+import com.pc.project.apistarter.model.request.pay.PayCallbackCommand;
 
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.env.Environment;

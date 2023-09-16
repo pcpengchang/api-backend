@@ -3,6 +3,7 @@ package com.pc.project.apistarter.cache;
 import com.google.common.collect.Sets;
 import com.pc.apicommon.model.entity.InterfaceInfo;
 import com.pc.project.apiinfrastructure.mapper.InterfaceInfoMapper;
+import com.pc.project.apistarter.utils.Monitor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.ApplicationListener;
 import org.springframework.context.event.ContextRefreshedEvent;
@@ -50,29 +51,26 @@ public class MemoryCacheLoader implements ApplicationListener<ContextRefreshedEv
     @Resource
     private InterfaceInfoMapper interfaceInfoMapper;
 
+    @Resource
+    private Monitor monitor;
+
     public boolean loadAllCache() {
-        try {
-            Set<Long> newBasicInfoCacheKeys = Sets.newHashSet();
-            // todo 只查id
-            List<InterfaceInfo> interfaceInfos = interfaceInfoMapper.selectList(null);
-            for (InterfaceInfo interfaceInfo : interfaceInfos) {
-                //更新基本信息缓存，并记录本次更新的key用于清除旧缓存
-                Long id = interfaceInfo.getId();
-                MemoryCacheManager.updateBaseInfo(id, interfaceInfo);
-                newBasicInfoCacheKeys.add(id);
-            }
-            //根据数据库构建结果，统一清理缓存中应不存在的key
-            MemoryCacheManager.cleanUpExpiredBaseInfo(newBasicInfoCacheKeys);
-            return true;
-        } catch (Exception e) {
-            log.error("接口本地缓存构建失败", e);
-            needRetryFlag.compareAndSet(false, true);
-            return false;
+        Set<Long> newBasicInfoCacheKeys = Sets.newHashSet();
+        // todo 只查id
+        List<InterfaceInfo> interfaceInfos = interfaceInfoMapper.selectList(null);
+        for (InterfaceInfo interfaceInfo : interfaceInfos) {
+            //更新基本信息缓存，并记录本次更新的key用于清除旧缓存
+            Long id = interfaceInfo.getId();
+            MemoryCacheManager.updateBaseInfo(id, interfaceInfo);
+            newBasicInfoCacheKeys.add(id);
         }
+        //根据数据库构建结果，统一清理缓存中应不存在的key
+        MemoryCacheManager.cleanUpExpiredBaseInfo(newBasicInfoCacheKeys);
+        return true;
     }
 
     private void retryLoadAllCache() {
-        if (needRetryFlag.get() && loadAllCache()) {
+        if (needRetryFlag.get() && monitor.runWithMonitor(this::loadAllCache, "loadAllCache", false)) {
             needRetryFlag.compareAndSet(true, false);
         }
     }
@@ -86,7 +84,20 @@ public class MemoryCacheLoader implements ApplicationListener<ContextRefreshedEv
         if (event.getApplicationContext().getParent() != null) {
             return;
         }
-        refreshExecutor.scheduleAtFixedRate(this::loadAllCache, 0, REFRESH_PERIOD, TimeUnit.MILLISECONDS);
-        retryExecutor.scheduleAtFixedRate(this::retryLoadAllCache, 0, RETRY_PERIOD, TimeUnit.MILLISECONDS);
+        refreshExecutor.scheduleAtFixedRate(() -> {
+            try {
+                monitor.runWithMonitorVoid(this::loadAllCache, "loadAllCache", false);
+            } catch (Exception e) {
+                log.error("接口本地缓存构建失败", e);
+                needRetryFlag.compareAndSet(false, true);
+            }
+        }, 0, REFRESH_PERIOD, TimeUnit.MILLISECONDS);
+        retryExecutor.scheduleAtFixedRate(() -> {
+            try {
+                monitor.runWithMonitorVoid(this::retryLoadAllCache, "retryLoadAllCache", false);
+            } catch (Exception e) {
+                log.error("接口本地缓存重载失败", e);
+            }
+        }, 0, RETRY_PERIOD, TimeUnit.MILLISECONDS);
     }
 }

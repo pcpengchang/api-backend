@@ -65,12 +65,16 @@ public class InterfaceInfoChangeConsumer {
             return;
         }
 
+        log.info("消费MQ消息：{}", messageDataList);
+
+        // fixme:手动延迟消费，防止影响主干缓存更新流程
+        Thread.sleep(30 * 1000);
+
         for (Map<String, Object> each : messageDataList) {
             Long id = Long.valueOf(each.get("id").toString());
 //            InterfaceInfo info = BeanUtil.convert(each, InterfaceInfo.class);
             InterfaceInfo info = interfaceInfoMapper.selectById(id);
             updateBaseInfo(info.getId(), info);
-            log.info("消费MQ消息：{}", info);
         }
 
         ack.acknowledge();

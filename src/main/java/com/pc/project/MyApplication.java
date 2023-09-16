@@ -9,7 +9,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * @author 18128332989
  */
 @SpringBootApplication
-@MapperScan("com.pc.project")
+@MapperScan("com.pc.project.apiinfrastructure.mapper")
 @EnableDubbo
 //@NacosPropertySource(dataId = "common", type = ConfigType.YAML, autoRefreshed = true)
 public class MyApplication {

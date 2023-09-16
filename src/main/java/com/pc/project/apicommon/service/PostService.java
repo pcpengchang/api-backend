@@ -3,7 +3,7 @@ package com.pc.project.apicommon.service;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.IService;
 import com.pc.apicommon.model.entity.Post;
-import com.pc.project.apidomain.post.PostQueryRequest;
+import com.pc.project.apistarter.model.request.post.PostQueryRequest;
 import com.pc.project.apistarter.model.vo.PostVO;
 
 /**

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.*;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Data;
 import lombok.EqualsAndHashCode;
+import lombok.ToString;
 
 import java.io.Serializable;
 import java.util.Date;
@@ -16,6 +17,7 @@ import java.util.Date;
 @EqualsAndHashCode
 @TableName(value ="interface_info")
 @Data
+@ToString
 public class InterfaceInfo implements Serializable {
     /**
      * 主键

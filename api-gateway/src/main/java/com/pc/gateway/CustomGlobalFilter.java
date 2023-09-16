@@ -5,12 +5,8 @@ import com.google.common.collect.Lists;
 import com.pc.apiclientsdk.utils.SignUtils;
 import com.pc.apicommon.model.entity.InterfaceInfo;
 import com.pc.apicommon.model.entity.User;
-import com.pc.apicommon.service.IInterfaceInfoService;
-import com.pc.apicommon.service.IUserInterfaceInfoService;
-import com.pc.apicommon.service.IUserService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.dubbo.config.annotation.DubboReference;
 import org.reactivestreams.Publisher;
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
@@ -28,6 +24,7 @@ import org.springframework.web.server.ServerWebExchange;
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
 
+import javax.annotation.Resource;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -44,20 +41,12 @@ import static org.springframework.cloud.gateway.support.ServerWebExchangeUtils.O
 @Component
 public class CustomGlobalFilter implements GlobalFilter, Ordered {
 
-    @DubboReference
-    private IUserService innerUserService;
-
-    @DubboReference
-    private IInterfaceInfoService innerInterfaceInfoService;
-
-    @DubboReference
-    private IUserInterfaceInfoService innerUserInterfaceInfoService;
+    @Resource
+    private RpcCommandManger rpcCommandManger;
 
     private static final List<String> IP_WHITE_LIST = Collections.singletonList("127.0.0.1");
 
-    private static final String INTERFACE_HOST = "/api";
-
-    private static Joiner joiner = Joiner.on("");
+    private static final Joiner JOINER = Joiner.on("");
 
     @Override
     public Mono<Void> filter(ServerWebExchange exchange, GatewayFilterChain chain) {
@@ -98,13 +87,8 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
 //            throw new RuntimeException(e);
 //        }
 
-        // 去数据库中查是否已分配ak给用户
-        User invokeUser = null;
-        try {
-            invokeUser = innerUserService.getInvokeUser(accessKey);
-        } catch (Exception e) {
-            log.error("getInvokeUser error", e);
-        }
+        // 是否已分配ak给用户
+        User invokeUser = rpcCommandManger.getInvokeUser(accessKey);
         if (invokeUser == null) {
             return handleNoAuth(response);
         }
@@ -130,14 +114,7 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
         }
 
         // 4. 请求的模拟接口是否存在，以及请求方法是否匹配
-        InterfaceInfo interfaceInfo = null;
-        try {
-            interfaceInfo = innerInterfaceInfoService.getInterfaceInfo(path);
-            log.info("interfaceInfo ===> {}", interfaceInfo);
-        } catch (Exception e) {
-            log.error("getInterfaceInfo error", e);
-        }
-
+        InterfaceInfo interfaceInfo = rpcCommandManger.getInterfaceInfo(path);
         if (interfaceInfo == null) {
             return handleNoAuth(response);
         }
@@ -145,7 +122,7 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
         // todo 是否还有调用次数
         // 5. 先扣减调用次数
         try {
-            innerUserInterfaceInfoService.reduceInvokeCount(interfaceInfo.getId(), invokeUser.getId());
+            rpcCommandManger.reduceInvokeCount(interfaceInfo.getId(), invokeUser.getId());
         } catch (Exception e) {
             log.error("用户接口调用次数【扣减】异常", e);
             return handleNoAuth(response);
@@ -211,7 +188,7 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
                                         log.error("返回体分段传输失败", e);
                                     }
                                 });
-                                String responseData = joiner.join(list);
+                                String responseData = JOINER.join(list);
                                 byte[] uppedContent = new String(responseData.getBytes(), StandardCharsets.UTF_8).getBytes();
                                 originalResponse.getHeaders().setContentLength(uppedContent.length);
                                 log.info("响应结果：{}", uppedContent);
@@ -220,7 +197,7 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
                         } else {
                             // 7. 调用失败，次数回滚
                             try {
-                                innerUserInterfaceInfoService.rollbackInvokeCount(interfaceInfoId, userId);
+                                rpcCommandManger.rollbackInvokeCount(interfaceInfoId, userId);
                             } catch (Exception e) {
                                 log.error("用户接口调用次数【回滚】异常", e);
                             }
@@ -235,7 +212,7 @@ public class CustomGlobalFilter implements GlobalFilter, Ordered {
             } else {
                 // 7. 调用失败，次数回滚
                 try {
-                    innerUserInterfaceInfoService.rollbackInvokeCount(interfaceInfoId, userId);
+                    rpcCommandManger.rollbackInvokeCount(interfaceInfoId, userId);
                 } catch (Exception e) {
                     log.error("invokeCount error", e);
                 }

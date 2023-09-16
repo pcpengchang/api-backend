@@ -1,7 +1,7 @@
 package com.pc.project.apitrigger.http;
 
 import com.pc.project.apicommon.response.BaseResponse;
-import com.pc.project.apicommon.service.GeneratorFacade;
+import com.pc.project.apicommon.service.GeneratorService;
 import com.pc.project.apistarter.model.vo.GenerateVO;
 import com.pc.project.apistarter.model.request.datagenerator.TableSchemaRequest;
 import com.pc.project.apistarter.utils.ResultUtils;
@@ -25,7 +25,7 @@ import java.io.IOException;
 @Slf4j
 public class SqlController {
     @Resource
-    private GeneratorFacade generatorFacade;
+    private GeneratorService generatorFacade;
 
     @ApiOperation(value = "输入表名、字段名和行数等")
     @PostMapping("/generate/schema")

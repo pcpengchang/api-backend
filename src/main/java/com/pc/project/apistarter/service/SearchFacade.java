@@ -56,9 +56,11 @@ public class SearchFacade {
 //                return userVOPage;
 //            });
 //
-            CompletableFuture<Page<PostVO>> postTask = CompletableFuture.supplyAsync(() -> postDataSource.doSearch(searchText, current, pageSize));
+            CompletableFuture<Page<PostVO>> postTask
+                    = CompletableFuture.supplyAsync(() -> postDataSource.doSearch(searchText, current, pageSize));
 
-            CompletableFuture<Page<Picture>> pictureTask = CompletableFuture.supplyAsync(() -> pictureDataSource.doSearch(searchText, current, pageSize));
+            CompletableFuture<Page<Picture>> pictureTask
+                    = CompletableFuture.supplyAsync(() -> pictureDataSource.doSearch(searchText, current, pageSize));
 
             CompletableFuture.allOf(postTask, pictureTask).join();
             // CompletableFuture.allOf(pictureTask).join();

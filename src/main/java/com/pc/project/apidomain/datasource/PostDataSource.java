@@ -1,9 +1,9 @@
 package com.pc.project.apidomain.datasource;
 
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
-import com.pc.project.apidomain.post.PostQueryRequest;
-import com.pc.project.apistarter.model.vo.PostVO;
 import com.pc.project.apicommon.service.PostService;
+import com.pc.project.apistarter.model.request.post.PostQueryRequest;
+import com.pc.project.apistarter.model.vo.PostVO;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
